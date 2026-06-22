@@ -116,7 +116,7 @@ impl HealthConditionTracker {
             });
         }
 
-        let progression_ratio = Self::calculate_progression_ratio(condition);
+        let progression_ratio = self.calculate_progression_ratio(condition);
         if progression_ratio >= self.alert_thresholds.progression_critical {
             alerts.push(HealthAlert {
                 alert_id: format!("prog_crit_{}", condition_name),
@@ -180,7 +180,7 @@ impl HealthConditionTracker {
         self.baseline_health_data = baseline;
     }
 
-    pub fn calculate_progression_ratio(condition: &MonitoredCondition) -> f64 {
+    pub fn calculate_progression_ratio(&self, condition: &MonitoredCondition) -> f64 {
         if condition.progression_markers.is_empty() {
             return 0.0;
         }

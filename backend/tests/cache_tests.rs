@@ -363,7 +363,7 @@ async fn delete_endpoint_has_no_store_cache_control() {
 
     let app = Router::new()
         .route(
-            "/api/things/:id",
+            "/api/things/{id}",
             delete(|| async { Json(json!({ "status": "deleted" })) }),
         )
         .layer(middleware::from_fn(

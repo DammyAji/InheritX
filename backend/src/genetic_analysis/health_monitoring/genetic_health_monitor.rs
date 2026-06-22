@@ -113,7 +113,7 @@ impl GeneticHealthMonitorService {
 
                 if meets_status {
                     let progression_ratio =
-                        HealthConditionTracker::calculate_progression_ratio(condition);
+                        self.health_tracker.calculate_progression_ratio(condition);
 
                     let urgency = if condition.current_status == ConditionStatus::Terminal {
                         UrgencyLevel::Critical

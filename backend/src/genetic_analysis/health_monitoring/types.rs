@@ -13,7 +13,7 @@ pub enum ConditionStatus {
     InRemission,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HealthTriggerType {
     GeneticConditionDetected(String),
@@ -69,7 +69,7 @@ pub enum CognitionLevel {
     Severe,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MedicalDataType {
     GeneticData,

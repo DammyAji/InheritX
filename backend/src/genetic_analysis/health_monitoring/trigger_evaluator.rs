@@ -1,5 +1,7 @@
 use super::errors::{EthicsError, TriggerError};
 use super::types::*;
+
+#[cfg(test)]
 use std::collections::HashMap;
 
 pub struct HealthTriggerEvaluator;
@@ -85,8 +87,7 @@ impl HealthTriggerEvaluator {
             .iter()
             .filter(|r| {
                 r.diagnosis_codes.iter().any(|code| {
-                    code.to_lowercase()
-                        .contains(&condition.condition_name.to_lowercase())
+                    Self::diagnosis_matches_condition(code, &condition.condition_name)
                 })
             })
             .collect();
@@ -221,6 +222,30 @@ impl HealthTriggerEvaluator {
             HealthTriggerType::GeneticConditionDetected(_) => UrgencyLevel::Medium,
             HealthTriggerType::CognitiveDecline(_) => UrgencyLevel::Medium,
             _ => UrgencyLevel::Low,
+        }
+    }
+
+    fn diagnosis_matches_condition(code: &str, condition_name: &str) -> bool {
+        let code_lower = code.to_lowercase();
+        let condition_lower = condition_name.to_lowercase();
+
+        if code_lower.contains(&condition_lower) {
+            return true;
+        }
+
+        let hypertension_codes = ["i10", "i11", "i12", "i13", "i14", "i15"];
+        let diabetes_codes = ["e10", "e11", "e12", "e13", "e14"];
+        let coronary_codes = ["i20", "i21", "i22", "i23", "i24", "i25"];
+
+        match condition_lower.as_str() {
+            "hypertension" => hypertension_codes.contains(&code_lower.as_str()),
+            "type 2 diabetes" | "type ii diabetes" | "diabetes" => {
+                diabetes_codes.contains(&code_lower.as_str())
+            }
+            "coronary artery disease" | "coronary artery disease (cad)" => {
+                coronary_codes.contains(&code_lower.as_str())
+            }
+            _ => false,
         }
     }
 
@@ -489,7 +514,6 @@ mod tests {
 
     #[test]
     fn test_prioritize_triggers() {
-        let evaluator = HealthTriggerEvaluator;
         let triggers = vec![
             EvaluatedTrigger {
                 trigger_id: "low".into(),

@@ -147,7 +147,7 @@ impl HealthDataAnonymizer {
         ];
 
         for (low, high, label) in &ranges {
-            if _timestamp > 0 && *_timestamp > 0 {
+            if _timestamp > 0 {
                 let age_estimate = 40;
                 if age_estimate >= *low && age_estimate < *high {
                     return label.to_string();
@@ -165,7 +165,6 @@ pub struct MedicalAccessController {
 struct AccessLogEntry {
     accessor: String,
     accessed_data: MedicalDataType,
-    action: String,
     timestamp: u64,
     allowed: bool,
 }
@@ -188,11 +187,6 @@ impl MedicalAccessController {
         self.access_log.push(AccessLogEntry {
             accessor: accessor.to_string(),
             accessed_data: data_type,
-            action: if allowed {
-                "ACCESS_GRANTED".into()
-            } else {
-                "ACCESS_DENIED".into()
-            },
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()

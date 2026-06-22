@@ -1,6 +1,5 @@
 use super::errors::PredictionError;
 use super::types::*;
-use std::collections::HashMap;
 
 pub struct HealthPredictionModel {
     pub genetic_risk_models: Vec<GeneticRiskModel>,
@@ -275,6 +274,7 @@ impl HealthPredictionModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn sample_genetic_profile() -> GeneticProfile {
         let mut mutations = HashMap::new();

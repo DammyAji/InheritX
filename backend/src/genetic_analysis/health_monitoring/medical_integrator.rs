@@ -148,13 +148,28 @@ impl PrescriptionTracker {
     }
 
     pub fn check_dosage(&self, medication: &Medication, max_daily_dose: f64) -> bool {
-        let dosage_value = medication
-            .dosage
-            .split_whitespace()
-            .next()
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(0.0);
-        dosage_value <= max_daily_dose
+        let dosage_str = medication.dosage.trim();
+        // extract numeric portion (handles values like "500mg", "0.5 g", "250.0")
+        let numeric: String = dosage_str
+            .chars()
+            .filter(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let per_dose: f64 = numeric.parse::<f64>().ok().unwrap_or(0.0);
+
+        // determine frequency multiplier (e.g., "twice daily" -> 2)
+        let freq = medication.frequency.to_lowercase();
+        let multiplier = if freq.contains("twice") || freq.contains("2x") || freq.contains("2 ") {
+            2.0
+        } else if freq.contains("three") || freq.contains("3x") || freq.contains("3 ") {
+            3.0
+        } else if freq.contains("once") || freq.contains("daily") || freq.contains("per day") {
+            1.0
+        } else {
+            1.0
+        };
+
+        let daily_dose = per_dose * multiplier;
+        daily_dose <= max_daily_dose
     }
 
     fn lookup_interaction(&self, drug_a: &str, drug_b: &str) -> Option<String> {
@@ -269,11 +284,11 @@ impl MedicalRecordIntegrator {
         codes
     }
 
-    pub fn find_relevant_records(
+    pub fn find_relevant_records<'a>(
         &self,
-        records: &[MedicalRecord],
+        records: &'a [MedicalRecord],
         condition: &str,
-    ) -> Vec<&MedicalRecord> {
+    ) -> Vec<&'a MedicalRecord> {
         let condition_lower = condition.to_lowercase();
         records
             .iter()
@@ -296,7 +311,6 @@ impl Default for MedicalRecordIntegrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     struct MockEHRClient;
 

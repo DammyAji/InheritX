@@ -80,8 +80,9 @@ pub use fitbit_integration::{
     SleepPatternAnalyzer, StressLevelMonitor,
 };
 pub use genetic_analysis::{
-    GeneticAnalysisService, GeneticDatabaseClient, GeneticError, GeneticSimilarityCalculator,
-    HealthConditionAnalyzer, PrivacyLevel, ProcessedDNAData, RiskAssessment,
+    GeneticAnalysisService, GeneticDatabaseClient, GeneticError, GeneticPrivacyComplianceEngine,
+    GeneticSimilarityCalculator, HealthConditionAnalyzer, PrivacyLevel, ProcessedDNAData,
+    RiskAssessment,
 };
 pub use governance::GovernanceService;
 pub use interest_reconciliation::InterestReconciliationService;

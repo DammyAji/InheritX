@@ -95,8 +95,12 @@ pub struct EthereumClient {
 
 impl EthereumClient {
     pub fn from_env() -> Result<Self, ServiceError> {
-        let rpc_url = std::env::var("ETHEREUM_RPC_URL").ok();
-        Ok(Self { rpc_url })
+        match std::env::var("ETHEREUM_RPC_URL") {
+            Ok(url) => Ok(Self { rpc_url: Some(url) }),
+            Err(_) => Err(ServiceError::Configuration(
+                "ETHEREUM_RPC_URL not set".to_string(),
+            )),
+        }
     }
 
     /// Get ETH balance for an address
@@ -144,8 +148,12 @@ pub struct PolygonClient {
 
 impl PolygonClient {
     pub fn from_env() -> Result<Self, ServiceError> {
-        let rpc_url = std::env::var("POLYGON_RPC_URL").ok();
-        Ok(Self { rpc_url })
+        match std::env::var("POLYGON_RPC_URL") {
+            Ok(url) => Ok(Self { rpc_url: Some(url) }),
+            Err(_) => Err(ServiceError::Configuration(
+                "POLYGON_RPC_URL not set".to_string(),
+            )),
+        }
     }
 
     /// Get MATIC balance for an address
@@ -190,8 +198,12 @@ pub struct ArbitrumClient {
 
 impl ArbitrumClient {
     pub fn from_env() -> Result<Self, ServiceError> {
-        let rpc_url = std::env::var("ARBITRUM_RPC_URL").ok();
-        Ok(Self { rpc_url })
+        match std::env::var("ARBITRUM_RPC_URL") {
+            Ok(url) => Ok(Self { rpc_url: Some(url) }),
+            Err(_) => Err(ServiceError::Configuration(
+                "ARBITRUM_RPC_URL not set".to_string(),
+            )),
+        }
     }
 
     /// Get ETH balance on Arbitrum
