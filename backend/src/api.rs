@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Query, State},
-    http::StatusCode,
+    body::Body,
+    extract::{Path, Query, State},
+    http::{HeaderValue, StatusCode},
     middleware::from_fn,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -16,6 +17,7 @@ use uuid::Uuid;
 
 use crate::auth::signature_auth_middleware;
 use crate::kyc_webhook::kyc_webhook_handler;
+use crate::pdf_report::{self, ReportData};
 use crate::stellar_anchor::AnchorRegistry;
 use crate::ws::{ws_handler, KycUpdateEvent};
 use crate::yield_calculator;
@@ -121,6 +123,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // Public or admin routes
     let public_routes = Router::new()
         .route("/api/plans", get(get_plans))
+        .route("/api/plans/:id/report", get(get_plan_report))
         .route("/api/anchor/payout-status", get(get_anchor_payouts))
         .route("/api/kyc/webhook", post(kyc_webhook_handler))
         .route("/ws/kyc", get(ws_handler));
@@ -695,8 +698,7 @@ async fn trigger_payout(
         "Payout trigger logic not implemented",
     )
 }
-//
-// Handler: Get Anchor Payouts
+/// Handler: Get Anchor Payouts
 // Queries the payouts table filtered by beneficiary_address with pagination.
 async fn get_anchor_payouts(
     State(state): State<Arc<AppState>>,
@@ -772,4 +774,126 @@ async fn get_anchor_payouts(
         }),
     )
         .into_response()
+}
+
+/// Handler: GET /api/plans/:id/report
+///
+/// Generates and returns a downloadable PDF inheritance audit report for the
+/// given plan.  PDF construction is offloaded to a blocking thread via
+/// `tokio::task::spawn_blocking` so it never stalls the async runtime.
+///
+/// The endpoint is public (no signature auth required) – the plan UUID in the
+/// URL acts as a capability token; plans are looked up by their primary key.
+async fn get_plan_report(
+    State(state): State<Arc<AppState>>,
+    Path(plan_id): Path<Uuid>,
+) -> Response {
+    // 1. Load the plan.
+    let plan = match sqlx::query_as::<_, PlanRow>(
+        r#"
+        SELECT id, owner_address, token_address, amount, grace_period,
+               grace_period_seconds, earn_yield, last_ping, is_active,
+               status, yield_rate_bps, accrued_yield, created_at
+        FROM plans
+        WHERE id = $1
+        "#,
+    )
+    .bind(plan_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Plan not found" })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            error!(error = %e, %plan_id, "Failed to fetch plan for report");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Database error" })),
+            )
+                .into_response();
+        }
+    };
+
+    // 2. Load beneficiaries.
+    let beneficiaries = match sqlx::query_as::<_, BeneficiaryRow>(
+        r#"
+        SELECT id, plan_id, wallet_address, allocation_bps, fiat_anchor_info
+        FROM beneficiaries
+        WHERE plan_id = $1
+        ORDER BY allocation_bps DESC
+        "#,
+    )
+    .bind(plan_id)
+    .fetch_all(&state.db_pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            error!(error = %e, %plan_id, "Failed to fetch beneficiaries for report");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Database error" })),
+            )
+                .into_response();
+        }
+    };
+
+    // 3. Compute live accrued yield (stored value + time elapsed since last ping).
+    let accrued_yield = compute_accrued_yield(&plan.amount, plan.yield_rate_bps, plan.last_ping)
+        + plan
+            .accrued_yield
+            .to_string()
+            .parse::<f64>()
+            .unwrap_or(0.0);
+
+    let report_data = ReportData {
+        plan,
+        beneficiaries,
+        accrued_yield,
+    };
+
+    // 4. Build PDF bytes on a blocking thread – avoids blocking the async executor.
+    let pdf_bytes = match tokio::task::spawn_blocking(move || pdf_report::build_pdf_bytes(report_data)).await
+    {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(e)) => {
+            error!(error = %e, "PDF generation failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to generate PDF" })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            error!(error = %e, "PDF generation task panicked");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "PDF generation task failed" })),
+            )
+                .into_response();
+        }
+    };
+
+    // 5. Return the PDF with appropriate download headers.
+    let filename = format!("inheritance-audit-{plan_id}.pdf");
+    let content_disposition = format!("attachment; filename=\"{filename}\"");
+
+    let mut response = Response::new(Body::from(pdf_bytes));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&content_disposition)
+            .unwrap_or_else(|_| HeaderValue::from_static("attachment; filename=\"report.pdf\"")),
+    );
+    response
 }
