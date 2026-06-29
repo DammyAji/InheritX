@@ -6,7 +6,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
-};use rust_decimal::Decimal;
+};
+use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -103,10 +105,6 @@ pub struct PayoutStatusResponse {
 }
 
 #[derive(Serialize)]
-struct ApiError {
-    error: String,
-}
-
 pub fn create_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -835,6 +833,13 @@ async fn ping_plan(
         &beneficiary_addresses,
     )
     .await;
+
+// Handler: Get Plan PDF Report
+// Generates a downloadable PDF audit report for a specific plan.
+async fn get_plan_report(
+    State(state): State<Arc<AppState>>,
+    Path(plan_id): Path<uuid::Uuid>,
+) -> impl IntoResponse {
     // 1. Load the plan.
     let plan = match sqlx::query_as::<_, PlanRow>(
         r#"
@@ -944,7 +949,8 @@ async fn ping_plan(
             .unwrap_or_else(|_| HeaderValue::from_static("attachment; filename=\"report.pdf\"")),
     );
     response
-=======
+}
+
 // --- KYC Endpoints ---
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1063,5 +1069,4 @@ async fn get_kyc_requirements() -> impl IntoResponse {
     };
 
     (StatusCode::OK, Json(response))
- master
 }
