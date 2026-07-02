@@ -59,15 +59,43 @@ pub fn generate(data: PlanReportData) -> Result<Vec<u8>, String> {
     // Plan Details
     line!(bold, 11.0, "Plan Details");
     line!(regular, 9.0, format!("Plan ID:          {}", data.plan_id));
-    line!(regular, 9.0, format!("Owner:            {}", data.owner_address));
-    line!(regular, 9.0, format!("Token:            {}", data.token_address));
+    line!(
+        regular,
+        9.0,
+        format!("Owner:            {}", data.owner_address)
+    );
+    line!(
+        regular,
+        9.0,
+        format!("Token:            {}", data.token_address)
+    );
     line!(regular, 9.0, format!("Amount:           {}", data.amount));
     line!(regular, 9.0, format!("Status:           {}", data.status));
-    line!(regular, 9.0, format!("Earn Yield:       {}", data.earn_yield));
-    line!(regular, 9.0, format!("Yield Rate (bps): {}", data.yield_rate_bps));
-    line!(regular, 9.0, format!("Accrued Yield:    {}", data.accrued_yield));
-    line!(regular, 9.0, format!("Grace Period (s): {}", data.grace_period_seconds));
-    line!(regular, 9.0, format!("Created At:       {}", data.created_at));
+    line!(
+        regular,
+        9.0,
+        format!("Earn Yield:       {}", data.earn_yield)
+    );
+    line!(
+        regular,
+        9.0,
+        format!("Yield Rate (bps): {}", data.yield_rate_bps)
+    );
+    line!(
+        regular,
+        9.0,
+        format!("Accrued Yield:    {}", data.accrued_yield)
+    );
+    line!(
+        regular,
+        9.0,
+        format!("Grace Period (s): {}", data.grace_period_seconds)
+    );
+    line!(
+        regular,
+        9.0,
+        format!("Created At:       {}", data.created_at)
+    );
     y -= section_gap;
 
     // Beneficiaries
@@ -76,9 +104,25 @@ pub fn generate(data: PlanReportData) -> Result<Vec<u8>, String> {
         line!(regular, 9.0, "  None");
     } else {
         for (i, b) in data.beneficiaries.iter().enumerate() {
-            line!(regular, 9.0, format!("  [{}] Wallet:     {}", i + 1, b.wallet_address));
-            line!(regular, 9.0, format!("      Allocation: {} bps ({:.2}%)", b.allocation_bps, b.allocation_bps as f32 / 100.0));
-            line!(regular, 9.0, format!("      Fiat Info:  {}", b.fiat_anchor_info));
+            line!(
+                regular,
+                9.0,
+                format!("  [{}] Wallet:     {}", i + 1, b.wallet_address)
+            );
+            line!(
+                regular,
+                9.0,
+                format!(
+                    "      Allocation: {} bps ({:.2}%)",
+                    b.allocation_bps,
+                    b.allocation_bps as f32 / 100.0
+                )
+            );
+            line!(
+                regular,
+                9.0,
+                format!("      Fiat Info:  {}", b.fiat_anchor_info)
+            );
         }
     }
     y -= section_gap;
@@ -95,7 +139,12 @@ pub fn generate(data: PlanReportData) -> Result<Vec<u8>, String> {
                 let nl = doc.get_page(new_page).get_layer(new_layer);
                 // shadow layer for remaining content - can't rebind macro, write directly
                 nl.use_text(
-                    format!("  [{}] {} | Yield snapshot: {}", i + 1, p.pinged_at, p.accrued_yield_snapshot),
+                    format!(
+                        "  [{}] {} | Yield snapshot: {}",
+                        i + 1,
+                        p.pinged_at,
+                        p.accrued_yield_snapshot
+                    ),
                     9.0,
                     Mm(left),
                     Mm(277.0),
@@ -104,7 +153,16 @@ pub fn generate(data: PlanReportData) -> Result<Vec<u8>, String> {
                 y = 270.0;
                 continue;
             }
-            line!(regular, 9.0, format!("  [{}] {} | Yield snapshot: {}", i + 1, p.pinged_at, p.accrued_yield_snapshot));
+            line!(
+                regular,
+                9.0,
+                format!(
+                    "  [{}] {} | Yield snapshot: {}",
+                    i + 1,
+                    p.pinged_at,
+                    p.accrued_yield_snapshot
+                )
+            );
         }
     }
 
