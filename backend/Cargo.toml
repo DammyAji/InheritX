@@ -30,3 +30,6 @@ stellar-strkey = "0.0.8"
 ed25519-dalek = { version = "2.1", features = ["pkcs8", "rand_core"] }
 printpdf = "0.7"
 redis = { version = "0.27", features = ["tokio-comp"] }
+dashmap = "6"
+prometheus = { version = "0.13", features = ["process"] }
+once_cell = "1.19"
