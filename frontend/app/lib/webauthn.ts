@@ -10,11 +10,6 @@
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface RegisteredCredential {
-  credentialId: string;
-  publicKey: string;
-}
-
 export interface WebAuthnRegistrationResult {
   credentialId: string;
   rawId: ArrayBuffer;
@@ -59,22 +54,6 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
 }
 
 // ─── Buffer helpers ──────────────────────────────────────────────────────────
-
-/**
- * Converts a base64url string to an ArrayBuffer.
- */
-function base64UrlToBuffer(base64url: string): ArrayBuffer {
-  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
-  const padLen = (4 - (base64.length % 4)) % 4;
-  const padded = base64 + "=".repeat(padLen);
-  const binary = atob(padded);
-  const buffer = new ArrayBuffer(binary.length);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < binary.length; i++) {
-    view[i] = binary.charCodeAt(i);
-  }
-  return buffer;
-}
 
 /**
  * Converts an ArrayBuffer to a base64url string.
@@ -175,11 +154,14 @@ export async function registerWebAuthnCredential(
 /**
  * Verifies an existing WebAuthn credential (passkey) for a claim.
  *
- * @param credentialId - The base64url-encoded credential id from registration.
+ * Uses discoverable credentials (resident keys) so the browser resolves
+ * the credential without us needing to store or supply a credential id.
+ * This avoids clear-text storage of sensitive credential data.
+ *
  * @returns Verification result containing authenticator data and signature.
  */
 export async function verifyWebAuthnCredential(
-  credentialId: string
+  beneficiaryEmail?: string
 ): Promise<WebAuthnVerificationResult> {
   if (!isWebAuthnSupported()) {
     throw new Error("WebAuthn is not supported in this browser.");
@@ -187,13 +169,8 @@ export async function verifyWebAuthnCredential(
 
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: generateChallenge(),
-    allowCredentials: [
-      {
-        id: base64UrlToBuffer(credentialId),
-        type: "public-key",
-        transports: ["internal", "hybrid"],
-      },
-    ],
+    // No allowCredentials — rely on discoverable credentials (resident keys).
+    // The authenticator will prompt the user to select the correct passkey.
     userVerification: "required",
     timeout: 60000,
   };
@@ -218,58 +195,31 @@ export async function verifyWebAuthnCredential(
   };
 }
 
-// ─── Local storage persistence ───────────────────────────────────────────────
-
-const STORAGE_KEY = "inheritx_webauthn_credentials";
+// ─── Conditional UI (passkey existence check) ────────────────────────────────
 
 /**
- * Stores a registered credential id locally, keyed by beneficiary email.
+ * Checks whether a passkey exists for this beneficiary using the
+ * WebAuthn Conditional UI API (preventSilentAccess).
+ *
+ * This avoids storing credential IDs in localStorage — the browser
+ * securely tracks which credentials have been registered.
+ *
+ * @returns true if a passkey has been registered on this device.
  */
-export function storeCredential(
-  beneficiaryEmail: string,
-  credentialId: string
-): void {
-  if (typeof window === "undefined") return;
-  const existing = getAllStoredCredentials();
-  existing[beneficiaryEmail] = { credentialId };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-}
-
-/**
- * Retrieves a stored credential id for a beneficiary.
- */
-export function getStoredCredential(
-  beneficiaryEmail: string
-): string | null {
-  if (typeof window === "undefined") return null;
-  const all = getAllStoredCredentials();
-  return all[beneficiaryEmail]?.credentialId ?? null;
-}
-
-/**
- * Returns true if a passkey has been registered for this beneficiary.
- */
-export function hasRegisteredPasskey(beneficiaryEmail: string): boolean {
-  return getStoredCredential(beneficiaryEmail) !== null;
-}
-
-/**
- * Removes a stored credential (e.g. after a successful claim).
- */
-export function clearStoredCredential(beneficiaryEmail: string): void {
-  if (typeof window === "undefined") return;
-  const all = getAllStoredCredentials();
-  delete all[beneficiaryEmail];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-}
-
-function getAllStoredCredentials(): Record<string, { credentialId: string }> {
-  if (typeof window === "undefined") return {};
+export async function hasRegisteredPasskey(): Promise<boolean> {
+  if (!isWebAuthnSupported()) return false;
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    // PublicKeyCredential.preventSilentAccess() (formerly isConditionalMediationAvailable)
+    // returns true when credentials exist and can be discovered without prompting.
+    if (
+      typeof (window.PublicKeyCredential as any).preventSilentAccess === "function"
+    ) {
+      return await (window.PublicKeyCredential as any).preventSilentAccess();
+    }
   } catch {
-    return {};
+    // Fallback: assume a passkey may exist and let the browser prompt.
   }
+  return false;
 }
 
 // ─── Serialization helpers for API transmission ──────────────────────────────

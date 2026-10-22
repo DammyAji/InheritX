@@ -19,8 +19,6 @@ import {
   registerWebAuthnCredential,
   verifyWebAuthnCredential,
   hasRegisteredPasskey,
-  storeCredential,
-  getStoredCredential,
   serializeVerificationResult,
 } from "@/app/lib/webauthn";
 import { plansAPI } from "@/app/lib/api/plans";
@@ -57,7 +55,7 @@ export function BeneficiaryMFAModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ─── Check WebAuthn availability on mount ───────────────────────────────
+  // ─── Check WebAuthn availability and existing passkey on mount ────────
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +63,8 @@ export function BeneficiaryMFAModal({
     setWebauthnSupported(supported);
     if (supported) {
       isPlatformAuthenticatorAvailable().then(setPlatformAvailable);
+      // Check if a passkey already exists using the WebAuthn Conditional UI API
+      hasRegisteredPasskey().then(setHasPasskey);
     }
   }, [open]);
 
@@ -76,8 +76,6 @@ export function BeneficiaryMFAModal({
       setAuthMethod("select");
       setError("");
       setTotpCode("");
-      const stored = getStoredCredential(plan.beneficiary_name ?? "");
-      setHasPasskey(stored !== null);
     }
   }, [open, plan]);
 
@@ -95,7 +93,6 @@ export function BeneficiaryMFAModal({
         beneficiaryEmail.trim(),
         beneficiaryName.trim() || plan.beneficiary_name || "Beneficiary"
       );
-      storeCredential(beneficiaryEmail.trim(), result.credentialId);
       setHasPasskey(true);
       setStep("verify");
     } catch (err) {
@@ -115,16 +112,12 @@ export function BeneficiaryMFAModal({
       setError("Please enter your beneficiary email.");
       return;
     }
-    const credentialId = getStoredCredential(beneficiaryEmail.trim());
-    if (!credentialId) {
-      setError("No passkey found for this beneficiary. Please register first.");
-      setStep("register");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const result = await verifyWebAuthnCredential(credentialId);
+      // Uses discoverable credentials — no credential ID stored in localStorage.
+      // The browser resolves the correct passkey via the resident key.
+      const result = await verifyWebAuthnCredential();
       const serialized = serializeVerificationResult(result);
 
       // Submit the claim with WebAuthn verification as the 2FA code
